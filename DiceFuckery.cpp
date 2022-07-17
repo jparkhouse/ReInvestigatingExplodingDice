@@ -100,6 +100,7 @@ public:
 	void send();
 private:
 	std::vector <int> collection;
+	void collapse(int i, PermutationsVector vec);
 };
 
 void PermutationsVector::collect(int a) {
@@ -111,24 +112,30 @@ void PermutationsVector::send() {
 	PermutationsVector::collection = {};
 }
 
+void PermutationsVector::collapse(int starting_value, PermutationsVector vec) {
+	std::vector <int> temp;
+	for (int i = 0; i < vec.size(); i++) {
+		temp = { starting_value };
+		for (int j = 0; j < vec[i].size(); j++) {
+			temp.push_back(vec[i][j]);
+		}
+		PermutationsVector::push_back(temp);
+	}
+}
+
 PermutationsVector keep_permutations(int target_value, int keep, dice die) {
+	//initialise variables
 	PermutationsVector out;
+	std::vector <int> permutation(keep, 1);
+	//sanitise inputs
+	if (keep > target_value) {
+		throw std::invalid_argument("argument target_value cannot be larger than argument keep");
+	}
 	if (keep < 1) {
 		throw std::invalid_argument("Argument keep must be greater than 0");
 	}
-	if (keep == 1) {
-		if (die.value_is_valid(target_value)) {
-			out.collect(target_value);
-			out.send();
-			return out;
-		}
-		else {
-			return out;
-		}
-	}
-	else {
-
-	}
+	//run code
+	
 }
 std::vector <double> get_probabilities(int max_value, int dice_roll, int dice_keep, int dice_faces) {
 	std::vector <double> out;
