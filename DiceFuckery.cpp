@@ -2,6 +2,8 @@
 #include <vector>
 #include <array>
 #include <map>
+#include <string>
+#include <cmath>
 
 std::map <std::array <int, 2>, std::vector <std::vector <int>>> permutations = {};
 int dice_faces = 12;
@@ -35,7 +37,10 @@ bool dice::value_is_valid(int value) {
 	if (i == value) {
 		return false;
 	}
-	return true;
+	if (i >= 1) {
+		return true;
+	}
+	return false;
 }
 
 std::array <int, 2> dice::get_value_counter(int value) {
@@ -91,41 +96,126 @@ double dice::get_probability_of_value(int value) {
 	return out;
 }
 
-class PermutationsVector : private std::vector <std::vector <int>> {
+class PermutationVector : private std::vector <std::vector <int>> {
 public:
 	using vector::operator[];
 	using vector::push_back;
 	using vector::size;
+	using vector::insert;
+	using vector::back;
 	void collect(int a);
 	void send();
+	void collapse(int i, PermutationVector vec);
 private:
 	std::vector <int> collection;
-	void collapse(int i, PermutationsVector vec);
 };
 
-void PermutationsVector::collect(int a) {
-	PermutationsVector::collection.push_back(a);
+void PermutationVector::collect(int a) {
+	PermutationVector::collection.push_back(a);
 }
 
-void PermutationsVector::send() {
-	PermutationsVector::push_back(PermutationsVector::collection);
-	PermutationsVector::collection = {};
+void PermutationVector::send() {
+	PermutationVector::push_back(PermutationVector::collection);
+	PermutationVector::collection = {};
 }
 
-void PermutationsVector::collapse(int starting_value, PermutationsVector vec) {
+void PermutationVector::collapse(int starting_value, PermutationVector vec) {
 	std::vector <int> temp;
 	for (int i = 0; i < vec.size(); i++) {
 		temp = { starting_value };
 		for (int j = 0; j < vec[i].size(); j++) {
 			temp.push_back(vec[i][j]);
 		}
-		PermutationsVector::push_back(temp);
+		PermutationVector::push_back(temp);
 	}
 }
 
-PermutationsVector keep_permutations(int target_value, int keep, dice die) {
+class PermutationCollector {
+public:
+	PermutationVector get_permutations(int target_value, int keep, int max, dice die);
+	int get_combinations(int max_value, int no_of_dice, dice die);
+private:
+	std::map <std::string, PermutationVector> permutations_map;
+	std::string get_key(int target_value, int keep);
+};
+
+int PermutationCollector::get_combinations(int max_value, int no_of_dice, dice die) {
+	int count_of_valid_values = 0;
+	int out = 1;
+	for (int i = 0; i <= max_value; i++) {
+		if (die.value_is_valid(i)) {
+			count_of_valid_values++;
+		}
+	}
+	for (int i = 0; i < no_of_dice; i++) {
+		out *= count_of_valid_values;
+	}
+	return out;
+}
+
+std::string PermutationCollector::get_key(int target_value, int keep) {
+	std::string out = "";
+	out += std::to_string(target_value);
+	out += "keep";
+	out += std::to_string(keep);
+	return out;
+}
+
+PermutationVector PermutationCollector::get_permutations(int target_value, int keep, int max, dice die) {
+	std::string key = PermutationCollector::get_key(target_value, keep);
+	PermutationVector out;
+	PermutationVector temp;
+
+	if (keep > target_value) {
+		throw std::invalid_argument("argument target_value cannot be larger than argument keep");
+	}
+	if (keep < 1) {
+		throw std::invalid_argument("Argument keep must be greater than 0");
+	}
+	if (PermutationCollector::permutations_map.contains(key)) {
+		return PermutationCollector::permutations_map.at(key);
+	}
+	if (keep == 1) {
+		std::vector <int> keep1 = {};
+		if (die.value_is_valid(target_value)) {
+			keep1.push_back(target_value);
+			out.push_back(keep1);
+		}		
+		return out;
+	}
+	if (keep == 2) {
+		std::vector <int> temp_v;
+		for (int i = target_value - 1; i >= target_value - i; i--) {
+			if (die.value_is_valid(i) && die.value_is_valid(target_value - i) && i <= max) {
+				temp_v = { i, target_value - i };
+				out.push_back(temp_v);
+			}
+		}
+		PermutationCollector::permutations_map.insert({ key, out });
+		return out;
+	}
+	if (target_value == keep) {
+		std::vector <int> keep1 = {};
+		for (int i = 0; i < keep; i++) {
+			keep1.push_back(1);
+		}
+		out.push_back(keep1);
+		PermutationCollector::permutations_map.insert({ key, out });
+		return out;
+	}
+	for (int i = std::min(target_value - keep + 1, max); i > (target_value - i)/keep; i--) {
+		if (die.value_is_valid(i)) {
+			temp = PermutationCollector::get_permutations(target_value - i, keep - 1, i, die);
+			out.collapse(i, temp);
+		}
+	}
+	PermutationCollector::permutations_map.insert({ key, out });
+	return out;
+}
+
+PermutationVector keep_permutations(int target_value, int keep, dice die) {
 	//initialise variables
-	PermutationsVector out;
+	PermutationVector out;
 	std::vector <int> permutation(keep, 1);
 	//sanitise inputs
 	if (keep > target_value) {
@@ -153,3 +243,14 @@ std::vector <double> get_probabilities(int max_value, int dice_roll, int dice_ke
 	return out;
 }
 
+int main() {
+	PermutationCollector x;
+	dice die(10);
+	PermutationVector Y = x.get_permutations(20, 4, 20, die);
+	for (int i = 0; i < Y.size(); i++) {
+		for (int j = 0; j < Y[i].size(); j++) {
+			std::cout << Y[i][j] << ", ";
+		}
+		std::cout << "\n";
+	}
+}
